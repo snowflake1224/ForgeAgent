@@ -1,0 +1,24 @@
+name: smoke-calc
+version: "0.1.0"
+description: Deterministic smoke benchmark for the calculator repair fixture.
+architectures:
+  - A_single_agent
+  - B_planner_coder
+  - C_planner_coder_reviewer
+  - D_specialized_multi_agent
+model_provider: mock
+model_name: mock-gpt
+skill_version: "0.1.0"
+tool_version: "0.1.0"
+tasks:
+  - task_id: calc_bug
+    repository: calc_bug
+    issue_title: Fix the add function
+    issue_body: The add(a, b) function subtracts b instead of adding it. Make the existing test pass.
+    validation_commands:
+      - python -m pytest -q
+    timeout_seconds: 120
+    token_budget: 100000
+    tags:
+      - smoke
+      - python

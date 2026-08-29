@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ForgeAgent</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">LOCAL CONTROL PLANE</p>
+      <h1>ForgeAgent</h1>
+      <p>Submit a repository task and inspect the measured execution trace.</p>
+    </header>
+
+    <section class="panel">
+      <h2>New task</h2>
+      <form id="task-form">
+        <label>Workspace path<input id="workspace" required placeholder="C:\path\to\repository"></label>
+        <label>Issue title<input id="title" required value="Resolve repository issue"></label>
+        <label>Issue body<textarea id="body" rows="4"></textarea></label>
+        <label>Architecture
+          <select id="architecture">
+            <option value="A_single_agent">Single agent</option>
+            <option value="B_planner_coder">Planner + coder</option>
+            <option value="C_planner_coder_reviewer">Planner + coder + reviewer</option>
+            <option value="D_specialized_multi_agent" selected>Specialized multi-agent</option>
+          </select>
+        </label>
+        <button type="submit">Create and run</button>
+      </form>
+      <p id="status" role="status"></p>
+    </section>
+
+    <section id="results" class="results hidden">
+      <div class="panel"><h2>Timeline</h2><div id="timeline"></div></div>
+      <div class="panel"><h2>Diff</h2><pre id="diff"></pre></div>
+      <div class="panel"><h2>Tests</h2><pre id="tests"></pre></div>
+      <div class="panel"><h2>Metrics</h2><pre id="metrics"></pre></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

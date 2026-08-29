@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.env
+.env.local
+*.egg
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Runtime / artifacts
+data/
+artifacts/
+runs/
+.forge/
+*.log
+otel-traces/
+tmp/
+.worktrees/
+
+# Secrets
+*.pem
+*.key
+credentials.json
+secrets.yaml
+
+# Node (web)
+apps/web/node_modules/
+apps/web/dist/
+
+# Docker
+docker-compose.override.yml
