@@ -21,7 +21,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-import shutil
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -174,20 +173,22 @@ class DockerSandboxExecutor(SandboxExecutor):
                 "pids_limit": 256,
                 "detach": True,
                 "environment": request.env,
+                "read_only": True,
+                "tmpfs": {"/tmp": "rw,noexec,nosuid,size=64m"},
+                "cap_drop": ["ALL"],
+                "security_opt": ["no-new-privileges:true"],
+                "init": True,
             }
-            getuid = getattr(os, "getuid", None)
-            getgid = getattr(os, "getgid", None)
-            if getuid is not None and getgid is not None:
-                run_kwargs["user"] = f"{getuid()}:{getgid()}"
             container = client.containers.run(**run_kwargs)
             result = container.wait(timeout=int(request.timeout_seconds))
-            logs = container.logs(stdout=True, stderr=True).decode("utf-8", errors="replace")
+            stdout = container.logs(stdout=True, stderr=False).decode("utf-8", errors="replace")
+            stderr = container.logs(stdout=False, stderr=True).decode("utf-8", errors="replace")
             exit_code = int(result.get("StatusCode", 1))
             duration_ms = (time.perf_counter() - start) * 1000
             return ExecutionResult(
                 exit_code=exit_code,
-                stdout=logs,
-                stderr="",
+                stdout=stdout,
+                stderr=stderr,
                 duration_ms=duration_ms,
                 timed_out=False,
                 backend=self.backend_name,
@@ -247,6 +248,6 @@ def create_executor(settings: Settings | None = None) -> SandboxExecutor:
     cfg = settings or get_settings()
     if cfg.sandbox_backend == "local":
         return LocalProcessExecutor()
-    if shutil.which("docker") is None and cfg.sandbox_allow_local_fallback:
-        return LocalProcessExecutor()
+    # Docker is fail-closed by default. Host execution only occurs when the
+    # operator explicitly selects local or enables the documented fallback.
     return FallbackSandboxExecutor(cfg)

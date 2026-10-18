@@ -9,6 +9,8 @@ skills, tools, execution backends, persistence, and evaluation.
 2. `Orchestrator.run(task, workspace_root=...)` creates bounded run state.
 3. `SkillRuntime` performs issue and repository analysis, implementation, tests,
    diagnosis, debugging, review, validation, and commit preparation.
+   Implementation is delegated either to a provider-neutral structured-edit
+   model backend or the real Claude Code CLI backend.
 4. Skills invoke registered MCP tools through `MCPRegistry`; the registry applies
    policy, JSON Schema validation, timeout, tracing, and redaction.
 5. Test commands execute through Docker or the explicitly unsafe local backend.
@@ -30,7 +32,9 @@ comparisons can control more variables. No loop is unbounded.
 
 - `config`: environment-backed settings.
 - `domain`: canonical enums and Pydantic contracts.
-- `models`: mock, OpenAI-compatible, and Anthropic providers.
+- `models`: mock, OpenAI-compatible, and Anthropic providers using a common
+  structured-edit protocol for coding.
+- `integrations`: selectable external coding backends, including Claude Code.
 - `mcp`: structured tool registry and built-ins.
 - `execution`: Docker, local, and fallback executors.
 - `skills`: explicit skill catalog and executable runtime.

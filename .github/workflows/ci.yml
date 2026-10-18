@@ -17,3 +17,9 @@ jobs:
       - run: uv run ruff check packages/forgeagent tests
       - run: uv run mypy packages/forgeagent
       - run: uv run pytest -q
+      - name: Build sandbox image
+        run: docker build -f infra/Dockerfile.sandbox -t forgeagent/sandbox:latest .
+      - name: Validate live Docker sandbox
+        env:
+          FORGE_RUN_DOCKER_TESTS: "1"
+        run: uv run pytest -q tests/test_docker_sandbox.py

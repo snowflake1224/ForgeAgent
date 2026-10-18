@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
 from typing import Any
 
+from forgeagent.config import Settings, get_settings
 from forgeagent.domain import ReviewVerdict, TestResultSummary
+from forgeagent.integrations.claude_code import ClaudeCodeBackend
 from forgeagent.mcp import MCPRegistry, ToolContext
-from forgeagent.models import LLMProvider, Message, estimate_cost_usd
+from forgeagent.models import LLMProvider, LLMResponse, Message, estimate_cost_usd
 from forgeagent.observability import MODEL_LATENCY, TOKENS_TOTAL, span, timed_histogram
 from forgeagent.security import sanitize_prompt_untrusted
 from forgeagent.skills import SkillName, SkillResult, get_skill
@@ -25,11 +26,15 @@ class SkillRuntime:
         *,
         workspace_root: str,
         run_id: str,
+        settings: Settings | None = None,
+        claude_code_backend: ClaudeCodeBackend | None = None,
     ) -> None:
         self.registry = registry
         self.llm = llm
         self.workspace_root = workspace_root
         self.run_id = run_id
+        self.settings = settings or get_settings()
+        self.claude_code_backend = claude_code_backend or ClaudeCodeBackend(self.settings)
         self.tokens_in = 0
         self.tokens_out = 0
         self.estimated_cost = 0.0
@@ -56,7 +61,7 @@ class SkillRuntime:
             self.invalid_tool_calls += 1
         return result.to_structured()
 
-    async def llm_advise(self, system: str, user: str) -> str:
+    async def _complete(self, system: str, user: str) -> LLMResponse:
         with span(  # noqa: SIM117 - nested scopes keep tracing and timing distinct
             "model.call", attributes={"provider": self.llm.name}
         ):
@@ -74,6 +79,10 @@ class SkillRuntime:
         self.estimated_cost += estimate_cost_usd(
             resp.model, resp.usage.prompt_tokens, resp.usage.completion_tokens
         )
+        return resp
+
+    async def llm_advise(self, system: str, user: str) -> str:
+        resp = await self._complete(system, user)
         return resp.content
 
     async def run_issue_analysis(self, issue: dict[str, Any]) -> SkillResult:
@@ -169,66 +178,181 @@ class SkillRuntime:
         selected_files: list[dict[str, str]],
         issue_text: str,
     ) -> SkillResult:
-        """Apply a minimal fix.
-
-        For deterministic offline demos, applies heuristic repairs for known
-        fixture patterns (e.g. buggy add function). Otherwise records LLM guidance
-        and performs best-effort targeted edits when a clear single-file target exists.
-        """
+        """Apply edits through the configured coding backend."""
         get_skill(SkillName.IMPLEMENTATION)
-        calls = 0
-        modified: list[str] = []
-
-        # Heuristic: fix intentional buggy fixture `add` returning wrong value.
-        root = Path(self.workspace_root)
-        for candidate in ["src/calc.py", "calc.py", "mathutil.py"]:
-            path = root / candidate
-            if path.is_file():
-                text = path.read_text(encoding="utf-8")
-                if "def add" in text and "return a - b" in text:
-                    new_text = text.replace("return a - b", "return a + b")
-                    w = await self.call_tool("fs.write", {"path": candidate, "content": new_text})
-                    calls += 1
-                    if w.get("success"):
-                        modified.append(candidate)
-
-        if not modified:
-            await self.llm_advise(
-                "You are a coding agent. Describe a minimal implementation for the issue.",
-                sanitize_prompt_untrusted(
-                    f"PLAN:\n{plan}\n\nISSUE:\n{issue_text}\n\nFILES:\n{selected_files}",
-                    source="implementation_context",
-                ),
+        if self.settings.coding_backend == "claude_code":
+            return await self._run_claude_code_implementation(
+                plan=plan,
+                issue_text=issue_text,
             )
-            # Best-effort: if issue mentions a file path, leave guidance only unless fixture matched.
-            for sel in selected_files[:3]:
-                p = sel.get("path")
-                if not p:
-                    continue
-                r = await self.call_tool("fs.read", {"path": p})
-                calls += 1
-                if not r.get("success"):
-                    continue
-                content = r.get("data", {}).get("content", "")
-                # Example pattern: TODO: fix me markers in curated benchmarks
-                if "TODO(forgeagent): fix return" in content:
-                    new_content = content.replace(
-                        "TODO(forgeagent): fix return",
-                        "fixed by ForgeAgent",
-                    )
-                    # Also apply a simple buggy pattern if present
-                    new_content = new_content.replace("return False  # buggy", "return True")
-                    w = await self.call_tool("fs.write", {"path": p, "content": new_content})
-                    calls += 1
-                    if w.get("success"):
-                        modified.append(p)
+        return await self._run_model_implementation(
+            plan=plan,
+            selected_files=selected_files,
+            issue_text=issue_text,
+        )
+
+    async def _run_claude_code_implementation(
+        self,
+        *,
+        plan: str,
+        issue_text: str,
+    ) -> SkillResult:
+        from pathlib import Path
+
+        title, _, body = issue_text.partition("\n")
+        result = await self.claude_code_backend.run_coding_task(
+            workdir=Path(self.workspace_root),
+            issue_title=title,
+            issue_body=body,
+            plan=plan,
+        )
+        status = await self.call_tool("git.status", {})
+        files = self._files_from_status(status)
+        success = result.success and bool(files)
+        error = None
+        if not result.success:
+            error = result.stderr or "Claude Code backend failed"
+        elif not files:
+            error = "Claude Code completed without modifying any files"
+        return SkillResult(
+            skill=SkillName.IMPLEMENTATION,
+            success=success,
+            outputs={
+                "backend": result.backend,
+                "files_modified": files,
+                "stdout": result.stdout[-4000:],
+                "timed_out": result.timed_out,
+            },
+            error=error,
+            tool_calls=1,
+        )
+
+    async def _run_model_implementation(
+        self,
+        *,
+        plan: str,
+        selected_files: list[dict[str, str]],
+        issue_text: str,
+    ) -> SkillResult:
+        calls = 0
+        if not selected_files:
+            selected = await self.call_tool(
+                "repo.select_relevant",
+                {"issue_text": issue_text, "budget_tokens": 16_000},
+            )
+            calls += 1
+            selected_files = list(selected.get("data", {}).get("selected", []))
+
+        file_context: list[dict[str, str]] = []
+        for selected in selected_files[:6]:
+            path = selected.get("path")
+            if not path:
+                continue
+            read = await self.call_tool("fs.read", {"path": path, "max_bytes": 40_000})
+            calls += 1
+            if read.get("success"):
+                file_context.append(
+                    {
+                        "path": path,
+                        "content": str(read.get("data", {}).get("content", "")),
+                    }
+                )
+
+        if not file_context:
+            return SkillResult(
+                skill=SkillName.IMPLEMENTATION,
+                success=False,
+                outputs={"backend": "model", "files_modified": []},
+                error="No readable relevant files were available to the coding model",
+                tool_calls=calls,
+            )
+
+        response = await self._complete(
+            (
+                "You are ForgeAgent's coding backend. Return only JSON with this schema: "
+                '{"summary":"...", "edits":[{"path":"relative/path","content":"complete replacement"}]}. '
+                "Make the smallest correct change. Paths must be from the supplied files. "
+                "Do not use markdown fences, shell commands, placeholders, or ellipses."
+            ),
+            sanitize_prompt_untrusted(
+                json.dumps(
+                    {
+                        "issue": issue_text,
+                        "plan": plan,
+                        "files": file_context,
+                    },
+                    ensure_ascii=False,
+                ),
+                source="coding_context",
+            ),
+        )
+        try:
+            payload = self._parse_edit_payload(response.content)
+        except ValueError as exc:
+            return SkillResult(
+                skill=SkillName.IMPLEMENTATION,
+                success=False,
+                outputs={"backend": "model", "files_modified": []},
+                error=str(exc),
+                tool_calls=calls,
+            )
+
+        allowed_paths = {item["path"] for item in file_context}
+        modified: list[str] = []
+        errors: list[str] = []
+        for edit in payload["edits"][:10]:
+            path = edit.get("path")
+            content = edit.get("content")
+            if path not in allowed_paths:
+                errors.append(f"Model attempted an unselected path: {path}")
+                self.invalid_tool_calls += 1
+                continue
+            if not isinstance(content, str) or len(content.encode("utf-8")) > 500_000:
+                errors.append(f"Invalid replacement content for {path}")
+                self.invalid_tool_calls += 1
+                continue
+            write = await self.call_tool("fs.write", {"path": path, "content": content})
+            calls += 1
+            if write.get("success"):
+                modified.append(path)
+            else:
+                errors.append(str(write.get("error") or f"Failed to write {path}"))
 
         return SkillResult(
             skill=SkillName.IMPLEMENTATION,
-            success=True,
-            outputs={"files_modified": modified, "plan": plan},
+            success=bool(modified) and not errors,
+            outputs={
+                "backend": "model",
+                "files_modified": modified,
+                "summary": payload.get("summary", ""),
+            },
+            error="; ".join(errors) or (None if modified else "Model returned no applicable edits"),
             tool_calls=calls,
         )
+
+    @staticmethod
+    def _parse_edit_payload(content: str) -> dict[str, Any]:
+        raw = content.strip()
+        if raw.startswith("```"):
+            raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Coding model returned invalid JSON: {exc.msg}") from exc
+        if not isinstance(payload, dict) or not isinstance(payload.get("edits"), list):
+            raise ValueError("Coding model response must contain an edits array")
+        for edit in payload["edits"]:
+            if not isinstance(edit, dict) or not isinstance(edit.get("path"), str):
+                raise ValueError("Each coding edit requires a string path")
+        return payload
+
+    @staticmethod
+    def _files_from_status(status: dict[str, Any]) -> list[str]:
+        files: list[str] = []
+        for line in str(status.get("data", {}).get("stdout", "")).splitlines():
+            if line.strip():
+                files.append(line[3:].strip() if len(line) > 3 else line.strip())
+        return files
 
     async def run_test_generation(self, existing_tests: dict[str, Any]) -> SkillResult:
         get_skill(SkillName.TEST_GENERATION)
@@ -326,7 +450,7 @@ class SkillRuntime:
 
     async def run_debugging(self, diagnosis: str) -> SkillResult:
         get_skill(SkillName.DEBUGGING)
-        # Re-use implementation heuristics with diagnosis context
+        # Re-run the selected coding backend with diagnosis as fresh context.
         result = await self.run_implementation(
             plan=diagnosis,
             selected_files=[],

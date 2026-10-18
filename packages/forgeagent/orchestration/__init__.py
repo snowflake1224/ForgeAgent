@@ -30,7 +30,13 @@ from forgeagent.execution import create_executor
 from forgeagent.mcp import InProcessMCPAdapter, MCPRegistry
 from forgeagent.mcp.builtin import register_builtin_tools
 from forgeagent.models import LLMProvider, create_llm_provider
-from forgeagent.observability import AGENT_FAILURES, TASKS_TOTAL, span
+from forgeagent.observability import (
+    AGENT_FAILURES,
+    RETRIES_TOTAL,
+    TASKS_TOTAL,
+    TEST_FAILURES,
+    span,
+)
 from forgeagent.security import ToolPolicy
 from forgeagent.skills.runtime import SkillRuntime
 
@@ -157,6 +163,7 @@ class Orchestrator:
             self.llm,
             workspace_root=state.workspace_root,
             run_id=run_id,
+            settings=self.settings,
         )
 
         with span(
@@ -286,6 +293,11 @@ class Orchestrator:
             output_summary=str(impl.outputs.get("files_modified")),
             duration_ms=(time.perf_counter() - t0) * 1000,
         )
+        if not impl.success:
+            state.failure_category = FailureCategory.IMPLEMENTATION
+            state.error = impl.error or "Coding backend did not produce a valid patch"
+            state.status = TaskStatus.FAILED
+            return
 
         # Test generation
         state.iterations += 1
@@ -319,10 +331,12 @@ class Orchestrator:
             )
             if te.success:
                 break
+            TEST_FAILURES.inc()
             if repair_i >= repair_loops:
                 state.failure_category = FailureCategory.TEST_FAILURE
                 state.error = te.error or "tests failed"
                 break
+            RETRIES_TOTAL.labels("repair_loop").inc()
             state.iterations += 1
             self._check_budgets(state, runtime)
             diag = await runtime.run_failure_diagnosis(state.test_results)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
@@ -82,7 +83,7 @@ class MockLLMProvider(LLMProvider):
         max_tokens: int | None = None,
     ) -> LLMResponse:
         self.call_count += 1
-        blob = "\n".join(m.content for m in messages).lower()
+        blob = "\n".join(m.content for m in messages)
         prompt_tokens = max(1, len(blob) // 4)
         content = self._synthesize(blob, tools)
         completion_tokens = max(1, len(content) // 4)
@@ -94,20 +95,23 @@ class MockLLMProvider(LLMProvider):
         )
 
     def _synthesize(self, blob: str, tools: list[ToolSpec] | None) -> str:
-        if "review" in blob and "patch" in blob:
+        lower_blob = blob.lower()
+        if "return only json" in lower_blob and '"files"' in blob:
+            return self._synthesize_edits(blob)
+        if "review" in lower_blob and "patch" in lower_blob:
             return (
                 "REVIEW_VERDICT: approved\n"
                 "RISK: low\n"
                 "SUMMARY: Patch is minimal, tests cover the change, no unsafe operations.\n"
                 "ISSUES: none"
             )
-        if "diagnose" in blob or "failure" in blob and "stack" in blob:
+        if "diagnose" in lower_blob or "failure" in lower_blob and "stack" in lower_blob:
             return (
                 "DIAGNOSIS: Assertion failed due to incorrect return value.\n"
                 "ROOT_CAUSE: Implementation does not match expected behavior.\n"
                 "FIX_PLAN: Adjust the function to return the correct value and re-run tests."
             )
-        if "plan" in blob or "planner" in blob:
+        if "plan" in lower_blob or "planner" in lower_blob:
             return (
                 "PROBLEM: Resolve the described software issue.\n"
                 "AREAS: source modules related to the failing behavior; existing tests.\n"
@@ -120,13 +124,13 @@ class MockLLMProvider(LLMProvider):
                 "TESTS: run project test suite\n"
                 "RISKS: over-editing unrelated files"
             )
-        if "implement" in blob or "coding" in blob or "modify" in blob:
+        if "implement" in lower_blob or "coding" in lower_blob or "modify" in lower_blob:
             return (
                 "IMPLEMENTATION_NOTES: Apply a minimal, targeted change.\n"
                 "Use filesystem tools to edit only files identified by analysis.\n"
                 "Do not rewrite unrelated modules."
             )
-        if "analyze" in blob or "repository" in blob:
+        if "analyze" in lower_blob or "repository" in lower_blob:
             return (
                 "ANALYSIS: Inspect file tree, search for issue keywords, "
                 "select a small set of relevant files within the context budget."
@@ -134,6 +138,39 @@ class MockLLMProvider(LLMProvider):
         return (
             "Acknowledged. Proceed with the next skill using available tools. "
             "Prefer minimal changes and explicit validation."
+        )
+
+    @staticmethod
+    def _synthesize_edits(blob: str) -> str:
+        """Produce deterministic structured edits for offline tests.
+
+        The mock adapter may recognize simple fixture defects; production coding
+        always uses the same provider-neutral JSON edit protocol.
+        """
+        marker = '<untrusted_content source="coding_context">\n'
+        start = blob.find(marker)
+        end = blob.find("\n</untrusted_content>", start)
+        if start < 0 or end < 0:
+            return json.dumps({"summary": "No coding context", "edits": []})
+        try:
+            context = json.loads(blob[start + len(marker) : end])
+        except json.JSONDecodeError:
+            return json.dumps({"summary": "Invalid coding context", "edits": []})
+
+        edits: list[dict[str, str]] = []
+        for item in context.get("files", []):
+            path = item.get("path")
+            content = item.get("content")
+            if not isinstance(path, str) or not isinstance(content, str):
+                continue
+            replacement = content.replace("return a - b", "return a + b")
+            if replacement != content:
+                edits.append({"path": path, "content": replacement})
+        return json.dumps(
+            {
+                "summary": "Applied deterministic mock edits for the offline fixture.",
+                "edits": edits,
+            }
         )
 
 

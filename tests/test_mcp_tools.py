@@ -28,8 +28,15 @@ async def test_builtin_tree_and_read_tools(tmp_path: Path) -> None:
 
     tree = await registry.invoke("repo.tree", {"max_depth": 3}, context)
     read = await registry.invoke("fs.read", {"path": "src/sample.py"}, context)
+    write = await registry.invoke(
+        "fs.write",
+        {"path": "src/generated.py", "content": "A = 1\r\nB = 2\r\n"},
+        context,
+    )
 
     assert tree.success
     assert "src/sample.py" in tree.data["tree"]
     assert read.success
     assert read.data["content"].splitlines() == ["VALUE = 42"]
+    assert write.success
+    assert (tmp_path / "src" / "generated.py").read_bytes() == b"A = 1\r\nB = 2\r\n"

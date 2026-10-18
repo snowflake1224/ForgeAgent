@@ -6,12 +6,16 @@ commands as untrusted.
 ## Trust boundaries
 
 Docker is the intended execution boundary. It applies CPU, memory, PID, timeout,
-and optional network restrictions and removes containers after execution.
+network, read-only-root, no-new-privileges, dropped-capability, and temporary
+filesystem restrictions and removes containers after execution. Docker
+unavailability fails closed by default.
 Review the sandbox image, Docker daemon permissions, mount mode, and host kernel
 before processing hostile repositories.
 
 `LocalProcessExecutor` runs on the host. It is **not** a sandbox and is only
-appropriate for trusted fixtures and development.
+appropriate for trusted fixtures and development. It is selected only through
+`FORGE_SANDBOX_BACKEND=local` or the explicit
+`FORGE_SANDBOX_ALLOW_LOCAL_FALLBACK=true` escape hatch.
 
 ## Controls
 
@@ -24,6 +28,9 @@ appropriate for trusted fixtures and development.
 - Prompt content is labeled as untrusted.
 - Common credentials are redacted from tool errors and logs.
 - Task iterations, tokens, tool calls, and wall time are bounded.
+- Model-generated edits are restricted to repository-analysis-selected paths,
+  size-limited, and written through MCP path authorization.
+- Claude Code backend time is bounded and no-change executions are failures.
 
 ## Operational requirements
 

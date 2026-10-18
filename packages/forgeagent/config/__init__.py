@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     llm_base_url: str | None = None
     llm_max_tokens: int = 4096
     llm_temperature: float = 0.0
+    coding_backend: Literal["model", "claude_code"] = "model"
 
     # Budgets
     max_agent_iterations: int = 12
@@ -54,7 +55,7 @@ class Settings(BaseSettings):
     sandbox_memory_limit_mb: int = 2048
     sandbox_timeout_seconds: int = 300
     sandbox_network_disabled: bool = True
-    sandbox_allow_local_fallback: bool = True
+    sandbox_allow_local_fallback: bool = False
 
     # GitHub
     github_token: SecretStr | None = None
@@ -70,6 +71,7 @@ class Settings(BaseSettings):
     claude_code_enabled: bool = False
     claude_code_command: str = "claude"
     claude_code_workdir: str | None = None
+    claude_code_timeout_seconds: int = 900
 
     # Security
     tool_policy_default: Literal["deny", "allow"] = "deny"

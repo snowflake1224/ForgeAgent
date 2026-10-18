@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ForgeAgent — what this page is</title>
+  <style>
+    :root { color-scheme: dark; --bg: #10131a; --card: #171d28; --line: #2c384c; --ink: #eef2f8; --muted: #b4c0d2; --accent: #c4b5fd; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, sans-serif; }
+    main { max-width: 860px; margin: auto; padding: 40px 20px 80px; }
+    h1 { font-size: clamp(2rem, 5vw, 3rem); letter-spacing: -0.04em; line-height: 1.1; margin: 12px 0; }
+    h2 { font-size: 1.15rem; margin: 0 0 8px; }
+    p, li, td { color: var(--muted); }
+    a { color: var(--accent); }
+    code { font-family: ui-monospace, monospace; color: var(--ink); }
+    .banner { border: 1px solid #5b4d86; background: #1c1730; border-radius: 14px; padding: 16px 18px; }
+    .banner strong { color: var(--ink); }
+    .kicker { color: var(--accent); font: 700 12px ui-monospace, monospace; letter-spacing: 0.14em; }
+    section { margin-top: 28px; }
+    article, table { background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+    article { padding: 16px 18px; }
+    table { width: 100%; border-collapse: collapse; overflow: hidden; }
+    th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+    th { color: var(--ink); font-size: 12px; letter-spacing: 0.04em; }
+    tr:last-child td { border-bottom: 0; }
+    .stats { display: grid; gap: 12px; margin-top: 12px; }
+    @media (min-width: 720px) { .stats { grid-template-columns: repeat(4, 1fr); } }
+    .stats article strong { display: block; color: var(--ink); font-size: 1.5rem; }
+    .stats article span { color: var(--muted); font-size: 13px; }
+    ul { padding-left: 1.1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="kicker">RECORDED SMOKE BENCHMARK</p>
+    <h1>ForgeAgent</h1>
+    <div class="banner">
+      <strong>This page is not a coding agent you can run.</strong>
+      <p>The sandbox is not on the public internet. What follows is one local benchmark from 30 August 2026: the same broken-calculator fixture, four agent architectures, mock model <code>mock-gpt</code>. It checks that orchestration finishes. It does not show general software-engineering ability. The case study is on <a href="https://faraazbuilds.vercel.app/projects/forgeagent">the portfolio</a>, and the source is on <a href="https://github.com/snowflake1224/ForgeAgent">GitHub</a>.</p>
+    </div>
+
+    <section>
+      <h2>What the system is</h2>
+      <p>ForgeAgent runs one repository task through four architectures so the architecture is the thing that changes. Tools, budgets, and the task stay the same. Every path stops at a limit on iterations, tool calls, tokens, and wall-clock time.</p>
+      <ul>
+        <li><code>A_single_agent</code> — one role runs the whole pipeline.</li>
+        <li><code>B_planner_coder</code> — a planner hands work to a coder.</li>
+        <li><code>C_planner_coder_reviewer</code> — a reviewer is added before the patch is accepted.</li>
+        <li><code>D_specialized_multi_agent</code> — planner, repository analysis, coding, test, debugging, and review are separate roles.</li>
+      </ul>
+      <p>Tools go through a registry with JSON Schema inputs, a deny-by-default policy, timeouts, and secret redaction. Generated patches still need a person to review them. If Docker is missing, execution fails closed unless a trusted local executor is chosen on purpose.</p>
+    </section>
+
+    <section>
+      <h2>This run</h2>
+      <div class="stats">
+        <article><strong>4 / 4</strong><span>architectures finished</span></article>
+        <article><strong>0</strong><span>regressions</span></article>
+        <article><strong>6.75</strong><span>average iterations</span></article>
+        <article><strong>17.5</strong><span>average tool calls</span></article>
+      </div>
+      <p>Average wall-clock time was 2978 ms. Patch acceptance and test pass rate were both 1.0. Invalid tool calls were 0. Mock token count was 4366. Experiment <code>exp_187a4932787a</code>.</p>
+      <table>
+        <thead>
+          <tr><th>Architecture</th><th>Result</th><th>Iterations</th><th>Tool calls</th><th>Time</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>A_single_agent</code></td><td>succeeded</td><td>6</td><td>14</td><td>3867 ms</td></tr>
+          <tr><td><code>B_planner_coder</code></td><td>succeeded</td><td>6</td><td>14</td><td>2738 ms</td></tr>
+          <tr><td><code>C_planner_coder_reviewer</code></td><td>succeeded</td><td>7</td><td>15</td><td>2394 ms</td></tr>
+          <tr><td><code>D_specialized_multi_agent</code></td><td>succeeded</td><td>8</td><td>27</td><td>2913 ms</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>How to read the table</h2>
+      <p>All four rows succeeded on one fixture, so the table does not say that more roles are better. Docker was unavailable for this particular run, so it used the trusted local executor. CI is where the Docker sandbox is checked. A reviewer should treat this as evidence that the benchmark harness and the four paths run, then read the portfolio for the tool policy and the budgets.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -87,7 +87,9 @@ def register_builtin_tools(
     async def fs_write(ctx: ToolContext, args: dict[str, Any]) -> ToolResult:
         path = resolve_under_root(_workspace(ctx), args["path"])
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(args["content"], encoding="utf-8")
+        # Model responses contain explicit newlines. Disable platform newline
+        # translation so CRLF input is not written as CRCRLF on Windows.
+        path.write_text(args["content"], encoding="utf-8", newline="")
         return ToolResult(success=True, data={"path": args["path"], "bytes": len(args["content"])})
 
     async def fs_list(ctx: ToolContext, args: dict[str, Any]) -> ToolResult:

@@ -33,12 +33,10 @@ console = Console()
 
 
 def _settings() -> Settings:
-    """Use safe offline defaults for local CLI smoke runs."""
+    """Load settings; Docker remains the fail-closed execution default."""
     values: dict[str, Any] = {}
     if "FORGE_LLM_PROVIDER" not in os.environ:
         values["llm_provider"] = "mock"
-    if "FORGE_SANDBOX_BACKEND" not in os.environ:
-        values["sandbox_backend"] = "local"
     return Settings(**values)
 
 

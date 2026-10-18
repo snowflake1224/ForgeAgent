@@ -8,14 +8,17 @@ simulate Claude Code and does not route requests through the mock provider.
 1. Install Claude Code using Anthropic's supported installation path.
 2. Authenticate the CLI independently.
 3. Set `FORGE_CLAUDE_CODE_ENABLED=true`.
-4. Set `FORGE_CLAUDE_CODE_COMMAND` if the executable is not named `claude`.
-5. Prepare a dedicated worktree or workspace with appropriate permissions.
+4. Set `FORGE_CODING_BACKEND=claude_code`.
+5. Set `FORGE_CLAUDE_CODE_COMMAND` if the executable is not named `claude`.
+6. Prepare a dedicated worktree or workspace with appropriate permissions.
 
 `available` is true only when integration is enabled and the executable can be
 found. `run_coding_task` writes an auditable prompt under `.forge/`, invokes
 the CLI with print mode and the task prompt, captures stdout/stderr, and expects
 the real CLI to modify the configured workspace in place. ForgeAgent then owns
-test, review, and report phases.
+test, bounded debugging, review, final validation, and report phases. A
+non-zero exit, timeout, or successful invocation that makes no file changes
+terminates the implementation phase with a structured failure.
 
 ## Security
 
@@ -24,5 +27,6 @@ not make host execution safe. Operators must review the exact installed CLI
 version and flags, avoid broad host credentials, use isolated worktrees, and
 apply normal patch review and validation.
 
-The adapter is available as an integration component; automatic selection from
-the default orchestrator pipeline is not implemented yet.
+The orchestrator selects this backend through `FORGE_CODING_BACKEND`. The
+default `model` backend instead requests structured whole-file edits from the
+configured provider and validates every path through the MCP filesystem policy.
