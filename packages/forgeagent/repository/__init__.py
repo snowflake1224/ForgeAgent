@@ -1,4 +1,4 @@
-﻿"""Repository intelligence exports."""
+"""Repository intelligence exports."""
 
 from forgeagent.repository.intelligence import RepositoryIntelligence, estimate_tokens
 
