@@ -38,7 +38,7 @@ from forgeagent.observability import (
     span,
 )
 from forgeagent.security import ToolPolicy
-from forgeagent.skills.runtime import SkillRuntime
+from forgeagent.skills.runtime import SkillRuntime, _filter_git_status_files
 
 
 @dataclass
@@ -127,6 +127,8 @@ class Orchestrator:
         input_summary: str,
         output_summary: str,
         error: str | None = None,
+        tokens_in: int = 0,
+        tokens_out: int = 0,
         duration_ms: float = 0.0,
     ) -> None:
         state.steps.append(
@@ -137,6 +139,8 @@ class Orchestrator:
                 input_summary=input_summary[:500],
                 output_summary=output_summary[:1000],
                 error=error,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
                 duration_ms=duration_ms,
             )
         )
@@ -224,6 +228,8 @@ class Orchestrator:
         state.iterations += 1
         self._check_budgets(state, runtime)
         t0 = time.perf_counter()
+        tin0, tout0 = runtime.tokens_in, runtime.tokens_out
+        runtime.current_role = role_plan
         with span("agent.invocation", attributes={"role": role_plan.value}):
             analysis = await runtime.run_issue_analysis(state.task.issue.model_dump())
         state.problem_statement = str(analysis.outputs.get("problem_statement", ""))
@@ -235,6 +241,8 @@ class Orchestrator:
             success=analysis.success,
             input_summary=state.task.issue.title,
             output_summary=state.problem_statement,
+            tokens_in=runtime.tokens_in - tin0,
+            tokens_out=runtime.tokens_out - tout0,
             duration_ms=(time.perf_counter() - t0) * 1000,
         )
 
@@ -243,6 +251,8 @@ class Orchestrator:
         self._check_budgets(state, runtime)
         issue_text = f"{state.task.issue.title}\n{state.task.issue.body}"
         t0 = time.perf_counter()
+        tin0, tout0 = runtime.tokens_in, runtime.tokens_out
+        runtime.current_role = AgentRole.REPOSITORY_ANALYST
         with span("agent.invocation", attributes={"role": AgentRole.REPOSITORY_ANALYST.value}):
             repo = await runtime.run_repository_analysis(
                 issue_text,
@@ -257,12 +267,17 @@ class Orchestrator:
             input_summary="repository analysis",
             output_summary=f"selected={len(state.selected_files)}",
             error=repo.error,
+            tokens_in=runtime.tokens_in - tin0,
+            tokens_out=runtime.tokens_out - tout0,
             duration_ms=(time.perf_counter() - t0) * 1000,
         )
 
         if specialized:
             state.iterations += 1
             self._check_budgets(state, runtime)
+            t0 = time.perf_counter()
+            tin0, tout0 = runtime.tokens_in, runtime.tokens_out
+            runtime.current_role = AgentRole.REPOSITORY_ANALYST
             words = re.findall(r"[A-Za-z_][A-Za-z0-9_]{3,}", issue_text)[:6]
             search = await runtime.run_code_search(words or ["test", "fix"])
             self._record_step(
@@ -272,12 +287,17 @@ class Orchestrator:
                 success=search.success,
                 input_summary=str(words),
                 output_summary=f"hits={len(search.outputs.get('hits', []))}",
+                tokens_in=runtime.tokens_in - tin0,
+                tokens_out=runtime.tokens_out - tout0,
+                duration_ms=(time.perf_counter() - t0) * 1000,
             )
 
         # Implementation
         state.iterations += 1
         self._check_budgets(state, runtime)
         t0 = time.perf_counter()
+        tin0, tout0 = runtime.tokens_in, runtime.tokens_out
+        runtime.current_role = role_code
         with span("agent.invocation", attributes={"role": role_code.value}):
             impl = await runtime.run_implementation(
                 plan=state.plan_summary,
@@ -291,6 +311,8 @@ class Orchestrator:
             success=impl.success,
             input_summary="implement",
             output_summary=str(impl.outputs.get("files_modified")),
+            tokens_in=runtime.tokens_in - tin0,
+            tokens_out=runtime.tokens_out - tout0,
             duration_ms=(time.perf_counter() - t0) * 1000,
         )
         if not impl.success:
@@ -301,6 +323,9 @@ class Orchestrator:
 
         # Test generation
         state.iterations += 1
+        t0 = time.perf_counter()
+        tin0, tout0 = runtime.tokens_in, runtime.tokens_out
+        runtime.current_role = AgentRole.TEST
         tg = await runtime.run_test_generation({"test_files": []})
         self._record_step(
             state,
@@ -309,6 +334,9 @@ class Orchestrator:
             success=tg.success,
             input_summary="test generation",
             output_summary=str(tg.outputs.get("note")),
+            tokens_in=runtime.tokens_in - tin0,
+            tokens_out=runtime.tokens_out - tout0,
+            duration_ms=(time.perf_counter() - t0) * 1000,
         )
 
         commands = self._commands(state)
@@ -316,6 +344,8 @@ class Orchestrator:
             state.iterations += 1
             self._check_budgets(state, runtime)
             t0 = time.perf_counter()
+            tin0, tout0 = runtime.tokens_in, runtime.tokens_out
+            runtime.current_role = AgentRole.TEST
             with span("agent.invocation", attributes={"role": AgentRole.TEST.value}):
                 te = await runtime.run_test_execution(commands)
             state.test_results = list(te.outputs.get("test_results", []))
@@ -327,6 +357,8 @@ class Orchestrator:
                 input_summary=f"test loop={repair_i}",
                 output_summary=f"success={te.success}",
                 error=te.error,
+                tokens_in=runtime.tokens_in - tin0,
+                tokens_out=runtime.tokens_out - tout0,
                 duration_ms=(time.perf_counter() - t0) * 1000,
             )
             if te.success:
@@ -339,6 +371,9 @@ class Orchestrator:
             RETRIES_TOTAL.labels("repair_loop").inc()
             state.iterations += 1
             self._check_budgets(state, runtime)
+            t0 = time.perf_counter()
+            tin0, tout0 = runtime.tokens_in, runtime.tokens_out
+            runtime.current_role = AgentRole.DEBUGGING
             diag = await runtime.run_failure_diagnosis(state.test_results)
             self._record_step(
                 state,
@@ -347,8 +382,13 @@ class Orchestrator:
                 success=diag.success,
                 input_summary="diagnose",
                 output_summary=str(diag.outputs.get("diagnosis", ""))[:500],
+                tokens_in=runtime.tokens_in - tin0,
+                tokens_out=runtime.tokens_out - tout0,
+                duration_ms=(time.perf_counter() - t0) * 1000,
             )
             state.iterations += 1
+            t0 = time.perf_counter()
+            tin0, tout0 = runtime.tokens_in, runtime.tokens_out
             deb = await runtime.run_debugging(str(diag.outputs.get("fix_plan", "")))
             self._record_step(
                 state,
@@ -357,12 +397,17 @@ class Orchestrator:
                 success=deb.success,
                 input_summary="debug",
                 output_summary=str(deb.outputs.get("files_modified")),
+                tokens_in=runtime.tokens_in - tin0,
+                tokens_out=runtime.tokens_out - tout0,
+                duration_ms=(time.perf_counter() - t0) * 1000,
             )
 
         if review and state.status == TaskStatus.RUNNING and not state.error:
             state.iterations += 1
             self._check_budgets(state, runtime)
             t0 = time.perf_counter()
+            tin0, tout0 = runtime.tokens_in, runtime.tokens_out
+            runtime.current_role = AgentRole.REVIEWER
             with span("agent.invocation", attributes={"role": AgentRole.REVIEWER.value}):
                 rev = await runtime.run_patch_review(
                     issue_text=issue_text,
@@ -378,6 +423,8 @@ class Orchestrator:
                 success=rev.success,
                 input_summary="patch review",
                 output_summary=f"approved={state.review.approved}",
+                tokens_in=runtime.tokens_in - tin0,
+                tokens_out=runtime.tokens_out - tout0,
                 duration_ms=(time.perf_counter() - t0) * 1000,
             )
             if not state.review.approved:
@@ -391,6 +438,9 @@ class Orchestrator:
 
         state.iterations += 1
         self._check_budgets(state, runtime)
+        t0 = time.perf_counter()
+        tin0, tout0 = runtime.tokens_in, runtime.tokens_out
+        runtime.current_role = AgentRole.ORCHESTRATOR
         final = await runtime.run_final_validation(commands)
         state.test_results = list(final.outputs.get("final_test_results", state.test_results))
         state.patch_diff = str(final.outputs.get("diff") or state.patch_diff)
@@ -402,7 +452,12 @@ class Orchestrator:
             input_summary="final validation",
             output_summary=f"success={final.success}",
             error=final.error,
+            tokens_in=runtime.tokens_in - tin0,
+            tokens_out=runtime.tokens_out - tout0,
+            duration_ms=(time.perf_counter() - t0) * 1000,
         )
+        t0 = time.perf_counter()
+        tin0, tout0 = runtime.tokens_in, runtime.tokens_out
         commit = await runtime.run_git_commit_preparation()
         state.commit_message = str(commit.outputs.get("commit_message") or "")
         state.files_changed = list(commit.outputs.get("files_changed") or [])
@@ -414,6 +469,9 @@ class Orchestrator:
             success=commit.success,
             input_summary="commit prep",
             output_summary=state.commit_message or "",
+            tokens_in=runtime.tokens_in - tin0,
+            tokens_out=runtime.tokens_out - tout0,
+            duration_ms=(time.perf_counter() - t0) * 1000,
         )
         if not final.success:
             state.failure_category = FailureCategory.TEST_FAILURE
@@ -461,6 +519,7 @@ class Orchestrator:
                 failure_category=state.failure_category,
             ),
             steps=state.steps,
+            tool_calls=runtime.tool_call_records,
             selected_files=state.selected_files,
             error=state.error,
             finished_at=utcnow(),
@@ -486,9 +545,7 @@ class Orchestrator:
                     text=True,
                     timeout=30,
                 )
-                for line in status.splitlines():
-                    if line.strip():
-                        files.append(line[3:].strip() if len(line) > 3 else line.strip())
+                files.extend(_filter_git_status_files(status))
         except Exception:
             pass
         return PatchArtifact(

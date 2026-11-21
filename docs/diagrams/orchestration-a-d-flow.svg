@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 540" role="img" aria-label="ForgeAgent Architecture Variants A to D Orchestration Flow">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1020"/>
+      <stop offset="100%" stop-color="#131b35"/>
+    </linearGradient>
+    <marker id="arr2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8"/>
+    </marker>
+    <marker id="arr-warn" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b"/>
+    </marker>
+    <style>
+      .t { font: 700 19px 'Inter', 'Segoe UI', system-ui, sans-serif; fill: #f8fafc; }
+      .s { font: 400 12px 'Inter', 'Segoe UI', system-ui, sans-serif; fill: #94a3b8; }
+      .node { fill: #192446; stroke: #3b82f6; stroke-width: 1.4; rx: 10; }
+      .gate { fill: #251e3d; stroke: #a855f7; stroke-width: 1.4; rx: 10; }
+      .ok { fill: #122d32; stroke: #10b981; stroke-width: 1.5; rx: 10; }
+      .fail { fill: #2f1826; stroke: #f43f5e; stroke-width: 1.4; rx: 10; }
+      .nt { font: 600 12.5px 'Inter', 'Segoe UI', system-ui, sans-serif; fill: #f8fafc; }
+      .ns { font: 400 10.5px 'JetBrains Mono', monospace; fill: #94a3b8; }
+      .e { stroke: #38bdf8; stroke-width: 1.6; fill: none; marker-end: url(#arr2); }
+      .ew { stroke: #f59e0b; stroke-width: 1.6; stroke-dasharray: 5 4; fill: none; marker-end: url(#arr-warn); }
+      .lbl { font: 600 10.5px 'JetBrains Mono', monospace; fill: #cbd5e1; }
+      .card { fill: #12192e; stroke: #25345c; stroke-width: 1.2; rx: 10; }
+    </style>
+  </defs>
+
+  <rect width="1100" height="540" fill="url(#bg2)"/>
+  <text x="34" y="40" class="t">Bounded Repair &amp; Ablation Pipeline (Architectures AD)</text>
+  <text x="34" y="60" class="s">Controlled experimental pipeline sharing the same MCP tools, ExecutionBudget limits, and ExecutionReport contract</text>
+
+  <!-- Main horizontal pipeline -->
+  <rect x="34" y="96" width="180" height="64" class="node"/>
+  <text x="48" y="120" class="nt">1. Issue &amp; Repo</text>
+  <text x="48" y="138" class="ns">issue-analysis</text>
+  <text x="48" y="152" class="ns">repository-analysis</text>
+
+  <rect x="254" y="96" width="175" height="64" class="gate"/>
+  <text x="268" y="120" class="nt">2. Variant D Search</text>
+  <text x="268" y="138" class="ns">code-search skill</text>
+  <text x="268" y="152" class="ns">text + AST symbols</text>
+
+  <rect x="469" y="96" width="180" height="64" class="node"/>
+  <text x="483" y="120" class="nt">3. Implementation</text>
+  <text x="483" y="138" class="ns">JSON edits or</text>
+  <text x="483" y="152" class="ns">Claude Code CLI</text>
+
+  <rect x="689" y="96" width="175" height="64" class="node"/>
+  <text x="703" y="120" class="nt">4. Sandbox Tests</text>
+  <text x="703" y="138" class="ns">test-generation</text>
+  <text x="703" y="152" class="ns">test-execution (MCP)</text>
+
+  <rect x="904" y="96" width="162" height="64" class="gate"/>
+  <text x="918" y="120" class="nt">5. Patch Review</text>
+  <text x="918" y="138" class="ns">Variants C &amp; D only</text>
+  <text x="918" y="152" class="ns">explicit verdict</text>
+
+  <!-- Repair Loop & Outcomes -->
+  <rect x="689" y="232" width="175" height="64" class="fail"/>
+  <text x="703" y="256" class="nt">Bounded Debug Loop</text>
+  <text x="703" y="274" class="ns">failure-diagnosis</text>
+  <text x="703" y="288" class="ns">debugging (1..3 retries)</text>
+
+  <rect x="904" y="232" width="162" height="64" class="ok"/>
+  <text x="918" y="256" class="nt">6. Final Validation</text>
+  <text x="918" y="274" class="ns">re-run tests + git diff</text>
+  <text x="918" y="288" class="ns">git-commit-prep</text>
+
+  <rect x="469" y="232" width="180" height="64" class="fail"/>
+  <text x="483" y="256" class="nt">Deterministic Stop</text>
+  <text x="483" y="274" class="ns">BUDGET_EXCEEDED</text>
+  <text x="483" y="288" class="ns">TIMEOUT | REVIEW_REJECT</text>
+
+  <!-- Arrows -->
+  <path d="M 214 128 L 254 128" class="e"/>
+  <path d="M 429 128 L 469 128" class="e"/>
+  <path d="M 649 128 L 689 128" class="e"/>
+  <path d="M 864 128 L 904 128" class="e"/>
+  <path d="M 776 160 L 776 232" class="ew"/>
+  <path d="M 730 232 L 730 160" class="ew"/>
+  <text x="786" y="198" class="lbl">fail + retry</text>
+  <path d="M 985 160 L 985 232" class="e"/>
+  <text x="994" y="198" class="lbl">approved</text>
+  <path d="M 689 264 L 649 264" class="ew"/>
+  <path d="M 559 160 L 559 232" class="ew"/>
+
+  <!-- Variant comparison matrix -->
+  <rect x="34" y="346" width="1032" height="162" class="card"/>
+  <text x="52" y="372" class="nt">Comparable Agent Architecture Variants (Ablation Design)</text>
+
+  <text x="52" y="402" class="lbl">Architecture</text>
+  <text x="300" y="402" class="lbl">Max Repair Loops</text>
+  <text x="470" y="402" class="lbl">Independent Review</text>
+  <text x="660" y="402" class="lbl">Code Search Role</text>
+  <text x="850" y="402" class="lbl">Smoke Calc Observed</text>
+
+  <text x="52" y="426" class="ns">A_single_agent</text>
+  <text x="300" y="426" class="ns">1</text>
+  <text x="470" y="426" class="ns">No</text>
+  <text x="660" y="426" class="ns">No</text>
+  <text x="850" y="426" class="ns">6 iters · 14 tools</text>
+
+  <text x="52" y="448" class="ns">B_planner_coder</text>
+  <text x="300" y="448" class="ns">2</text>
+  <text x="470" y="448" class="ns">No</text>
+  <text x="660" y="448" class="ns">No</text>
+  <text x="850" y="448" class="ns">6 iters · 14 tools</text>
+
+  <text x="52" y="470" class="ns">C_planner_coder_reviewer</text>
+  <text x="300" y="470" class="ns">2</text>
+  <text x="470" y="470" class="ns">Yes (ReviewVerdict gate)</text>
+  <text x="660" y="470" class="ns">No</text>
+  <text x="850" y="470" class="ns">7 iters · 15 tools</text>
+
+  <text x="52" y="492" class="ns">D_specialized_multi_agent</text>
+  <text x="300" y="492" class="ns">3</text>
+  <text x="470" y="492" class="ns">Yes (ReviewVerdict gate)</text>
+  <text x="660" y="492" class="ns">Yes (AST + text hits)</text>
+  <text x="850" y="492" class="ns">8 iters · 27 tools</text>
+</svg>

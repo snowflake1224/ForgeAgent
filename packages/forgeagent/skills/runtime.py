@@ -7,13 +7,39 @@ import re
 from typing import Any
 
 from forgeagent.config import Settings, get_settings
-from forgeagent.domain import ReviewVerdict, TestResultSummary
+from forgeagent.domain import AgentRole, ReviewVerdict, TestResultSummary, ToolCallRecord
 from forgeagent.integrations.claude_code import ClaudeCodeBackend
 from forgeagent.mcp import MCPRegistry, ToolContext
 from forgeagent.models import LLMProvider, LLMResponse, Message, estimate_cost_usd
 from forgeagent.observability import MODEL_LATENCY, TOKENS_TOTAL, span, timed_histogram
-from forgeagent.security import sanitize_prompt_untrusted
+from forgeagent.security import redact_secrets, sanitize_prompt_untrusted
 from forgeagent.skills import SkillName, SkillResult, get_skill
+
+_IGNORED_GIT_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
+_IGNORED_GIT_SUFFIXES = (".pyc", ".pyo")
+
+
+def _filter_git_status_files(stdout: str) -> list[str]:
+    files: list[str] = []
+    for line in stdout.splitlines():
+        if not line.strip():
+            continue
+        path = (line[3:].strip() if len(line) > 3 else line.strip()).strip('"')
+        parts = set(path.replace("\\", "/").split("/"))
+        if parts & _IGNORED_GIT_PARTS or path.endswith(_IGNORED_GIT_SUFFIXES):
+            continue
+        files.append(path)
+    return files
+
+
+def _redact_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
+    cleaned: dict[str, Any] = {}
+    for key, value in arguments.items():
+        if isinstance(value, str):
+            cleaned[key] = redact_secrets(value)[:200]
+        else:
+            cleaned[key] = value
+    return cleaned
 
 
 class SkillRuntime:
@@ -40,11 +66,14 @@ class SkillRuntime:
         self.estimated_cost = 0.0
         self.tool_call_count = 0
         self.invalid_tool_calls = 0
+        self.tool_call_records: list[ToolCallRecord] = []
+        self.current_role: AgentRole | None = None
 
     def _ctx(self, metadata: dict[str, Any] | None = None) -> ToolContext:
         return ToolContext(
             workspace_root=self.workspace_root,
             run_id=self.run_id,
+            agent_role=self.current_role.value if self.current_role else None,
             metadata=metadata or {},
         )
 
@@ -57,8 +86,23 @@ class SkillRuntime:
     ) -> dict[str, Any]:
         self.tool_call_count += 1
         result = await self.registry.invoke(name, arguments, self._ctx(metadata))
-        if not result.success and result.error_type == "validation_error":
+        invalid = not result.success and result.error_type == "validation_error"
+        if invalid:
             self.invalid_tool_calls += 1
+        meta = result.data.get("_meta") if isinstance(result.data, dict) else {}
+        duration_ms = float(meta.get("duration_ms", 0.0)) if isinstance(meta, dict) else 0.0
+        self.tool_call_records.append(
+            ToolCallRecord(
+                tool_name=name,
+                arguments=_redact_arguments(arguments),
+                success=result.success,
+                result_summary=redact_secrets(json.dumps(result.data, default=str))[:300],
+                error=result.error,
+                duration_ms=duration_ms,
+                invalid=invalid,
+                agent_role=self.current_role,
+            )
+        )
         return result.to_structured()
 
     async def _complete(self, system: str, user: str) -> LLMResponse:
@@ -348,11 +392,7 @@ class SkillRuntime:
 
     @staticmethod
     def _files_from_status(status: dict[str, Any]) -> list[str]:
-        files: list[str] = []
-        for line in str(status.get("data", {}).get("stdout", "")).splitlines():
-            if line.strip():
-                files.append(line[3:].strip() if len(line) > 3 else line.strip())
-        return files
+        return _filter_git_status_files(str(status.get("data", {}).get("stdout", "")))
 
     async def run_test_generation(self, existing_tests: dict[str, Any]) -> SkillResult:
         get_skill(SkillName.TEST_GENERATION)
@@ -480,16 +520,21 @@ class SkillRuntime:
                 source="review_bundle",
             ),
         )
-        approved = "approved" in advice.lower() and "reject" not in advice.lower().split("approved")[0]
-        if "REVIEW_VERDICT: approved" in advice:
-            approved = True
-        if "REVIEW_VERDICT: rejected" in advice:
-            approved = False
-        # Deterministic rule: approve if tests passed and diff non-empty or fixture fixed
+        lower = advice.lower()
+        explicit_reject = "review_verdict: rejected" in lower
+        explicit_approve = "review_verdict: approved" in lower
         tests_ok = all(int(t.get("exit_code", 1)) == 0 for t in test_results) if test_results else False
-        if tests_ok:
-            approved = True
         issues: list[str] = []
+        if explicit_reject:
+            approved = False
+            issues.append("Reviewer explicitly rejected the patch")
+        elif not tests_ok:
+            approved = False
+            issues.append("Validation tests failed or did not run")
+        elif explicit_approve:
+            approved = True
+        else:
+            approved = ("approved" in lower and "reject" not in lower.split("approved")[0]) or tests_ok
         if not diff_text.strip() and not tests_ok:
             issues.append("No diff and tests not confirmed passing")
             approved = False
@@ -526,10 +571,7 @@ class SkillRuntime:
         status = await self.call_tool("git.status", {})
         diff = await self.call_tool("git.diff", {})
         diff_text = diff.get("data", {}).get("diff") or ""
-        files = []
-        for line in (status.get("data", {}).get("stdout") or "").splitlines():
-            if line.strip():
-                files.append(line[3:].strip() if len(line) > 3 else line.strip())
+        files = _filter_git_status_files(str(status.get("data", {}).get("stdout") or ""))
         message = "fix: resolve issue via ForgeAgent autonomous patch"
         return SkillResult(
             skill=SkillName.GIT_COMMIT_PREPARATION,

@@ -42,3 +42,6 @@ async def test_specialized_architecture_fixes_calc_fixture(tmp_path: Path) -> No
     assert report.test_results
     assert all(result.exit_code == 0 for result in report.test_results)
     assert "return a + b" in (workspace / "src" / "calc.py").read_text(encoding="utf-8")
+    assert report.tool_calls
+    assert all(not path.startswith("__pycache__") and not path.endswith(".pyc") for path in report.patch.files_changed)
+    assert any(step.tokens_in > 0 and step.tokens_out > 0 for step in report.steps)

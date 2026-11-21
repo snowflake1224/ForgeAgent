@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 640" role="img" aria-label="ForgeAgent Platform Architecture">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1020"/>
+      <stop offset="100%" stop-color="#111932"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#7dd3fc"/>
+    </marker>
+    <style>
+      .title { font: 700 20px 'Inter', 'Segoe UI', system-ui, sans-serif; fill: #f8fafc; }
+      .sub { font: 400 12px 'Inter', 'Segoe UI', system-ui, sans-serif; fill: #94a3b8; }
+      .zone { fill: #141d38; stroke: #2c3e6b; stroke-width: 1.5; rx: 14; }
+      .zlabel { font: 700 11px 'Inter', 'Segoe UI', system-ui, sans-serif; letter-spacing: 0.08em; fill: #7dd3fc; text-transform: uppercase; }
+      .box { fill: #1c284a; stroke: #3b82f6; stroke-width: 1.3; rx: 10; }
+      .box-sec { fill: #1f2242; stroke: #f59e0b; stroke-width: 1.3; rx: 10; }
+      .box-store { fill: #142a38; stroke: #10b981; stroke-width: 1.3; rx: 10; }
+      .btitle { font: 600 13px 'Inter', 'Segoe UI', system-ui, sans-serif; fill: #f1f5f9; }
+      .bsub { font: 400 11px 'JetBrains Mono', monospace; fill: #94a3b8; }
+      .edge { stroke: #7dd3fc; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+      .edge-dash { stroke: #f59e0b; stroke-width: 1.4; stroke-dasharray: 5 4; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1120" height="640" fill="url(#bg)"/>
+  <text x="36" y="42" class="title">ForgeAgent  Multi-Agent Coding, MCP Tool &amp; Sandbox Architecture</text>
+  <text x="36" y="62" class="sub">Python 3.12 · FastAPI + Typer CLI · Architectures AD · In-Process MCP Registry · Fail-Closed Docker Isolation · OTel + Prometheus</text>
+
+  <!-- Layer 1: Entry Surfaces -->
+  <rect x="36" y="84" width="1048" height="92" class="zone"/>
+  <text x="52" y="105" class="zlabel">1. Entry &amp; Experiment Surfaces</text>
+  <rect x="56" y="118" width="300" height="44" class="box"/>
+  <text x="72" y="138" class="btitle">Typer CLI (forge)</text>
+  <text x="72" y="154" class="bsub">task run · benchmark run · compare · trace</text>
+
+  <rect x="410" y="118" width="300" height="44" class="box"/>
+  <text x="426" y="138" class="btitle">FastAPI Control Plane &amp; /ui/</text>
+  <text x="426" y="154" class="bsub">/tasks · /runs/{id}/trace|diff|tests|metrics</text>
+
+  <rect x="764" y="118" width="300" height="44" class="box"/>
+  <text x="780" y="138" class="btitle">BenchmarkRunner</text>
+  <text x="780" y="154" class="bsub">YAML suite · clean workspaces · result.json</text>
+
+  <!-- Layer 2: Orchestration & Skills -->
+  <rect x="36" y="206" width="1048" height="120" class="zone"/>
+  <text x="52" y="227" class="zlabel">2. Bounded Orchestration &amp; Coding Backends</text>
+  <rect x="56" y="242" width="330" height="66" class="box"/>
+  <text x="72" y="263" class="btitle">Orchestrator (Variants A / B / C / D)</text>
+  <text x="72" y="280" class="bsub">max_iterations · max_tool_calls · token_budget</text>
+  <text x="72" y="296" class="bsub">bounded repair loops · review verdict gate</text>
+
+  <rect x="416" y="242" width="310" height="66" class="box"/>
+  <text x="432" y="263" class="btitle">SkillRuntime (11 Skill Contracts)</text>
+  <text x="432" y="280" class="bsub">analysis · implementation · debug · review</text>
+  <text x="432" y="296" class="bsub">per-step token delta + ToolCallRecord trace</text>
+
+  <rect x="756" y="242" width="308" height="66" class="box"/>
+  <text x="772" y="263" class="btitle">Model / External Backends</text>
+  <text x="772" y="280" class="bsub">Mock · OpenAI-Compatible · Anthropic</text>
+  <text x="772" y="296" class="bsub">or Claude Code CLI subprocess backend</text>
+
+  <!-- Layer 3: MCP & Security -->
+  <rect x="36" y="356" width="1048" height="114" class="zone"/>
+  <text x="52" y="377" class="zlabel">3. MCP Tool Gateway &amp; Security Policy</text>
+  <rect x="56" y="392" width="340" height="62" class="box-sec"/>
+  <text x="72" y="413" class="btitle">MCPRegistry &amp; ToolPolicy</text>
+  <text x="72" y="430" class="bsub">default-deny prefix check · Draft 2020-12 schema</text>
+  <text x="72" y="445" class="bsub">path traversal block · secret redaction · timeout</text>
+
+  <rect x="424" y="392" width="310" height="62" class="box"/>
+  <text x="440" y="413" class="btitle">RepositoryIntelligence</text>
+  <text x="440" y="430" class="bsub">tree · text/AST symbol search · discover_tests</text>
+  <text x="440" y="445" class="bsub">token-budget file selector (name/path/content)</text>
+
+  <rect x="762" y="392" width="302" height="62" class="box"/>
+  <text x="778" y="413" class="btitle">18 Built-In MCP Tools</text>
+  <text x="778" y="430" class="bsub">repo.* · fs.* · git.* · issue.get</text>
+  <text x="778" y="445" class="bsub">test.run · static.analyze · docs.* · inspect.*</text>
+
+  <!-- Layer 4: Sandbox, Store & Telemetry -->
+  <rect x="36" y="498" width="1048" height="116" class="zone"/>
+  <text x="52" y="519" class="zlabel">4. Sandboxed Execution, Persistence &amp; Observability</text>
+  <rect x="56" y="534" width="340" height="64" class="box-sec"/>
+  <text x="72" y="555" class="btitle">DockerSandboxExecutor (Fail-Closed)</text>
+  <text x="72" y="572" class="bsub">network=off · ro rootfs · cap_drop=ALL · pids=256</text>
+  <text x="72" y="587" class="bsub">CPU/memory caps · optional explicit local fallback</text>
+
+  <rect x="424" y="534" width="310" height="64" class="box-store"/>
+  <text x="440" y="555" class="btitle">SQLAlchemy Store &amp; Artifacts</text>
+  <text x="440" y="572" class="bsub">SQLite / Postgres rows · runs/&lt;id&gt;/report.json</text>
+  <text x="440" y="587" class="bsub">patch.diff · benchmark ExperimentResult store</text>
+
+  <rect x="762" y="534" width="302" height="64" class="box-store"/>
+  <text x="778" y="555" class="btitle">OpenTelemetry &amp; Prometheus</text>
+  <text x="778" y="572" class="bsub">OTLP + stderr spans (task/agent/model/mcp)</text>
+  <text x="778" y="587" class="bsub">counters &amp; latency histograms (:9090)</text>
+
+  <!-- Connecting edges -->
+  <path d="M 206 162 L 206 242" class="edge"/>
+  <path d="M 560 162 L 260 242" class="edge"/>
+  <path d="M 914 162 L 320 242" class="edge"/>
+  <path d="M 386 275 L 416 275" class="edge"/>
+  <path d="M 726 275 L 756 275" class="edge"/>
+  <path d="M 571 308 L 226 392" class="edge"/>
+  <path d="M 396 423 L 424 423" class="edge"/>
+  <path d="M 734 423 L 762 423" class="edge"/>
+  <path d="M 913 454 L 226 534" class="edge-dash"/>
+  <path d="M 221 308 L 579 534" class="edge"/>
+  <path d="M 320 308 L 913 534" class="edge"/>
+</svg>

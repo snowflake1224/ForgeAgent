@@ -11,24 +11,19 @@ Docker-oriented execution isolation, and reproducible benchmark reports.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  CLI[CLI / FastAPI / Web UI] --> O[Orchestrator]
-  O --> S[Skill runtime]
-  S --> L[LLM provider]
-  S --> M[MCP registry]
-  M --> R[Repository tools]
-  M --> F[Filesystem and git tools]
-  M --> X[Docker sandbox executor]
-  O --> P[(SQLite / Postgres store)]
-  O --> E[Evaluation reports]
-  O --> T[OpenTelemetry + Prometheus]
-```
+![ForgeAgent System Architecture](docs/diagrams/architecture.svg)
 
 Architectures A–D range from one role running the pipeline to specialized
 planner, repository-analysis, coding, test, debugging, and review roles.
 Every path has explicit iteration, tool-call, token, and wall-clock limits.
-See [architecture](docs/architecture.md).
+
+![Orchestration Variants A to D](docs/diagrams/orchestration-a-d-flow.svg)
+
+Deep-dive docs:
+- [Architecture](docs/architecture.md) & [Low-Level Design](docs/low-level-design.md)
+- [Architecture Interview Guide](docs/interview-guide.md)
+- [MCP Tools](docs/mcp.md) & [Agent Skills](docs/agent-skills.md)
+- [Security](docs/security.md), [Evaluation](docs/evaluation.md), and [Experiments](docs/experiments.md)
 
 ## MCP and skills
 

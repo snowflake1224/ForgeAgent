@@ -1,0 +1,38 @@
+flowchart TB
+    subgraph Entry["Entry Surfaces"]
+        CLI["Typer CLI (forge)"]
+        API["FastAPI + Web UI (/ui/)"]
+        BENCH["BenchmarkRunner (YAML configs)"]
+    end
+
+    subgraph Core["Orchestration & Skills"]
+        ORCH["Orchestrator (Variants A / B / C / D + Budgets)"]
+        SR["SkillRuntime (11 Skill Contracts)"]
+        LLM["LLMProvider (Mock / OpenAI / Anthropic) or Claude Code CLI"]
+    end
+
+    subgraph MCP["MCP & Security Layer"]
+        REG["MCPRegistry + JSON Schema + Policy + Redaction"]
+        REPO["RepositoryIntelligence (tree, symbol AST, token-budget file scorer)"]
+        TOOLS["Built-in Tools: repo.*, fs.*, git.*, test.*, static.*, docs.*, inspect.*"]
+    end
+
+    subgraph Isolation["Execution, Persistence & Telemetry"]
+        DOCKER["DockerSandboxExecutor (cap_drop ALL, ro root, no network)"]
+        LOCAL["LocalProcessExecutor (trusted dev opt-in)"]
+        STORE["SQLAlchemy Store (SQLite / Postgres) + runs/<id>/ Artifacts"]
+        OBS["OpenTelemetry (OTLP + stderr) + Prometheus Metrics"]
+    end
+
+    CLI --> ORCH
+    API --> ORCH
+    BENCH --> ORCH
+    ORCH --> SR
+    SR --> LLM
+    SR --> REG
+    REG --> REPO
+    REG --> TOOLS
+    TOOLS --> DOCKER
+    TOOLS --> LOCAL
+    ORCH --> STORE
+    ORCH --> OBS

@@ -32,12 +32,19 @@ form.addEventListener("submit", async (event) => {
     const run = await runResponse.json();
 
     statusNode.textContent = `${run.run_id}: ${run.status}`;
-    document.querySelector("#timeline").innerHTML = run.steps.map((step) =>
-      `<div class="step ${step.success ? "" : "failed"}">
-        <strong>${step.role}</strong> · ${step.skill}<br>
-        <small>${step.output_summary || step.error || ""}</small>
-      </div>`
-    ).join("");
+    const timelineNode = document.querySelector("#timeline");
+    timelineNode.replaceChildren(
+      ...run.steps.map((step) => {
+        const card = document.createElement("div");
+        card.className = `step ${step.success ? "" : "failed"}`.trim();
+        const role = document.createElement("strong");
+        role.textContent = step.role;
+        const summary = document.createElement("small");
+        summary.textContent = step.output_summary || step.error || "";
+        card.append(role, document.createTextNode(` · ${step.skill}`), document.createElement("br"), summary);
+        return card;
+      })
+    );
     document.querySelector("#diff").textContent = run.patch.diff || "(no diff)";
     document.querySelector("#tests").textContent = json(run.test_results);
     document.querySelector("#metrics").textContent = json(run.metrics);

@@ -3,19 +3,28 @@
 ForgeAgent separates orchestration policy from model providers, executable
 skills, tools, execution backends, persistence, and evaluation.
 
+![ForgeAgent Architecture](diagrams/architecture.svg)
+
+See also:
+- [Mermaid Architecture Diagram](diagrams/architecture.mmd)
+- [Orchestration Variants A–D Flow](diagrams/orchestration-a-d-flow.svg) ([source](diagrams/orchestration-a-d-flow.mmd))
+- [Low-Level Design](low-level-design.md)
+- [Interview Guide](interview-guide.md)
+
 ## Runtime flow
 
 1. A `TaskSpec` supplies issue text, repository location, architecture, and budgets.
 2. `Orchestrator.run(task, workspace_root=...)` creates bounded run state.
 3. `SkillRuntime` performs issue and repository analysis, implementation, tests,
-   diagnosis, debugging, review, validation, and commit preparation.
+   diagnosis, debugging, review, validation, and commit preparation while tracking
+   per-step token deltas and `ToolCallRecord` telemetry.
    Implementation is delegated either to a provider-neutral structured-edit
    model backend or the real Claude Code CLI backend.
 4. Skills invoke registered MCP tools through `MCPRegistry`; the registry applies
    policy, JSON Schema validation, timeout, tracing, and redaction.
 5. Test commands execute through Docker or the explicitly unsafe local backend.
-6. The orchestrator returns an `ExecutionReport` with steps, patch, tests, review,
-   measured metrics, status, and failure category.
+6. The orchestrator returns an `ExecutionReport` with steps, tool calls, patch,
+   tests, review, measured metrics, status, and failure category.
 
 ## Comparable architectures
 

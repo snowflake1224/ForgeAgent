@@ -18,7 +18,9 @@ def test_health_and_create_task(tmp_path: Path) -> None:
         metrics_enabled=False,
     )
     original_store = app.state.store
+    original_settings = app.state.settings
     app.state.store = Store(settings)
+    app.state.settings = settings
     try:
         with TestClient(app) as client:
             health = client.get("/health")
@@ -33,6 +35,7 @@ def test_health_and_create_task(tmp_path: Path) -> None:
             )
     finally:
         app.state.store = original_store
+        app.state.settings = original_settings
 
     assert health.status_code == 200
     assert health.json()["status"] == "ok"
