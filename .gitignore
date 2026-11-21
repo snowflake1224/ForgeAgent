@@ -49,5 +49,5 @@ apps/web/dist/
 # Docker
 docker-compose.override.yml
 
-# Local interview notes
+# Local notes
 project-description/
