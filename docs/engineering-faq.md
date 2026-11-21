@@ -1,4 +1,4 @@
-# Architecture Deep-Dive &amp; Interview Guide
+# Engineering FAQ
 
 This guide prepares engineering walkthroughs and technical deep-dives on ForgeAgent's architecture, security model, ablation evaluation design, and engineering trade-offs.
 

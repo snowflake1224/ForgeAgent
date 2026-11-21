@@ -21,7 +21,7 @@ Every path has explicit iteration, tool-call, token, and wall-clock limits.
 
 Deep-dive docs:
 - [Architecture](docs/architecture.md) & [Low-Level Design](docs/low-level-design.md)
-- [Architecture Interview Guide](docs/interview-guide.md)
+- [Engineering FAQ](docs/engineering-faq.md)
 - [MCP Tools](docs/mcp.md) & [Agent Skills](docs/agent-skills.md)
 - [Security](docs/security.md), [Evaluation](docs/evaluation.md), and [Experiments](docs/experiments.md)
 

@@ -9,7 +9,7 @@ See also:
 - [Mermaid Architecture Diagram](diagrams/architecture.mmd)
 - [Orchestration Variants A–D Flow](diagrams/orchestration-a-d-flow.svg) ([source](diagrams/orchestration-a-d-flow.mmd))
 - [Low-Level Design](low-level-design.md)
-- [Interview Guide](interview-guide.md)
+- [Engineering FAQ](engineering-faq.md)
 
 ## Runtime flow
 
