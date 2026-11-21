@@ -1,0 +1,24 @@
+flowchart TD
+    START([TaskSpec + ExecutionBudget]) --> ISSUE[Issue Analysis skill]
+    ISSUE --> REPO[Repository Analysis skill]
+    REPO --> SPEC{Specialized Variant D?}
+    SPEC -- yes --> SEARCH[Code Search skill]
+    SPEC -- no --> IMPL[Implementation skill]
+    SEARCH --> IMPL
+
+    IMPL -- failed --> FAIL([TaskStatus.FAILED])
+    IMPL -- edited files --> TGEN[Test Generation + Test Execution]
+
+    TGEN --> PASS{Tests exit 0?}
+    PASS -- yes --> REVGATE{Variant C or D review?}
+    PASS -- no --> RETRY{Repair loop budget left?}
+    RETRY -- yes --> DIAG[Failure Diagnosis -> Debugging edit]
+    DIAG --> TGEN
+    RETRY -- no --> FAIL
+
+    REVGATE -- yes --> REVIEW[Patch Review skill]
+    REVIEW -- rejected --> FAIL
+    REVIEW -- approved --> FINAL[Final Validation + Git Commit Prep]
+    REVGATE -- no --> FINAL
+
+    FINAL --> DONE([ExecutionReport + Trace + ToolCalls + Diff])

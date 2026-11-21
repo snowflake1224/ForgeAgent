@@ -9,9 +9,16 @@ from forgeagent.config import Settings
 from forgeagent.execution import ExecutionRequest, LocalProcessExecutor
 from forgeagent.mcp import MCPRegistry, MCPTool, ToolContext, ToolResult
 from forgeagent.mcp.builtin import register_builtin_tools
-from forgeagent.models import MockLLMProvider, create_llm_provider
+from forgeagent.models import (
+    LLMProvider,
+    LLMResponse,
+    LLMUsage,
+    Message,
+    MockLLMProvider,
+    create_llm_provider,
+)
 from forgeagent.security import SecurityError, ToolPolicy, resolve_under_root
-from forgeagent.skills.runtime import SkillRuntime
+from forgeagent.skills.runtime import SkillRuntime, _filter_git_status_files
 
 
 def test_settings_and_provider_factory(tmp_path: Path) -> None:
@@ -124,3 +131,52 @@ async def test_skill_runtime_applies_canonical_calc_repair(tmp_path: Path) -> No
     assert result.success
     assert result.outputs["files_modified"] == ["src/calc.py"]
     assert "return a + b" in source.read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_patch_review_honors_explicit_rejection_even_when_tests_pass(tmp_path: Path) -> None:
+    class RejectingProvider(LLMProvider):
+        name = "mock-reject"
+        model = "mock-gpt"
+
+        async def complete(self, messages: list[Message], **kwargs: object) -> LLMResponse:
+            return LLMResponse(
+                content="REVIEW_VERDICT: rejected\nISSUES: Unsafe change",
+                usage=LLMUsage(prompt_tokens=10, completion_tokens=10),
+                model=self.model,
+            )
+
+    settings = Settings(
+        env="test",
+        sandbox_backend="local",
+        tool_policy_default="allow",
+        data_dir=tmp_path / "data",
+        artifacts_dir=tmp_path / "artifacts",
+        runs_dir=tmp_path / "runs",
+    )
+    registry = MCPRegistry(policy=ToolPolicy(settings))
+    register_builtin_tools(registry, executor=LocalProcessExecutor())
+    runtime = SkillRuntime(
+        registry,
+        RejectingProvider(),
+        workspace_root=str(tmp_path),
+        run_id="run_reject",
+    )
+
+    result = await runtime.run_patch_review(
+        issue_text="Reject test",
+        test_results=[{"exit_code": 0, "passed": 1, "failed": 0}],
+    )
+
+    assert result.outputs["review_verdict"]["approved"] is False
+    assert "Reviewer explicitly rejected the patch" in result.outputs["review_verdict"]["issues"]
+
+
+def test_filter_git_status_ignores_python_caches() -> None:
+    porcelain = (
+        " M src/calc.py\n"
+        "?? src/__pycache__/calc.cpython-312.pyc\n"
+        "?? .pytest_cache/README.md\n"
+        "?? tests/test_new.py\n"
+    )
+    assert _filter_git_status_files(porcelain) == ["src/calc.py", "tests/test_new.py"]

@@ -21,6 +21,7 @@ from forgeagent.evaluation import (
     load_benchmark_config,
     load_experiment_result,
 )
+from forgeagent.observability import setup_observability
 from forgeagent.orchestration import Orchestrator
 from forgeagent.storage import Store
 
@@ -37,7 +38,10 @@ def _settings() -> Settings:
     values: dict[str, Any] = {}
     if "FORGE_LLM_PROVIDER" not in os.environ:
         values["llm_provider"] = "mock"
-    return Settings(**values)
+    cfg = Settings(**values)
+    if cfg.env != "test":
+        setup_observability(cfg)
+    return cfg
 
 
 def _store(settings: Settings) -> Store:

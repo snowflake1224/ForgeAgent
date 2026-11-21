@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import sys
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -77,9 +78,12 @@ class LocalProcessExecutor(SandboxExecutor):
                 start = time.perf_counter()
                 env = os.environ.copy()
                 env.update(request.env)
+                command = list(request.command)
+                if command and command[0] == "python":
+                    command[0] = sys.executable
                 try:
                     proc = await asyncio.create_subprocess_exec(
-                        *request.command,
+                        *command,
                         cwd=request.workdir,
                         env=env,
                         stdout=asyncio.subprocess.PIPE,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
@@ -20,6 +21,7 @@ from prometheus_client import Counter, Histogram, start_http_server
 from forgeagent.config import Settings, get_settings
 
 _tracer_ready = False
+_metrics_started = False
 
 TASKS_TOTAL = Counter(
     "forgeagent_tasks_total",
@@ -70,13 +72,13 @@ SANDBOX_FAILURES = Counter(
 
 
 def setup_observability(settings: Settings | None = None) -> None:
-    global _tracer_ready
+    global _tracer_ready, _metrics_started
     cfg = settings or get_settings()
     if cfg.otel_enabled and not _tracer_ready:
         resource = Resource.create({"service.name": "forgeagent"})
         provider = TracerProvider(resource=resource)
-        # Console exporter keeps local/dev usable without a collector.
-        provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+        # Send local console spans to stderr so CLI JSON output on stdout stays clean.
+        provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter(out=sys.stderr)))
         try:
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
                 OTLPSpanExporter,
@@ -85,15 +87,16 @@ def setup_observability(settings: Settings | None = None) -> None:
             exporter = OTLPSpanExporter(endpoint=f"{cfg.otel_exporter_otlp_endpoint}/v1/traces")
             provider.add_span_processor(SimpleSpanProcessor(exporter))
         except Exception:
-            # Collector may be unavailable; console export remains.
+            # Collector may be unavailable; stderr console export remains.
             pass
         trace.set_tracer_provider(provider)
         _tracer_ready = True
 
-    if cfg.metrics_enabled:
+    if cfg.metrics_enabled and not _metrics_started:
         # A second process may already own the configured metrics port.
         with suppress(OSError):
             start_http_server(cfg.metrics_port)
+        _metrics_started = True
 
 
 def get_tracer(name: str = "forgeagent") -> trace.Tracer:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, cast
 
@@ -12,8 +14,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
-from forgeagent.config import get_settings
+from forgeagent.config import Settings, get_settings
 from forgeagent.domain import ArchitectureKind, ExecutionReport, IssueSpec, RepoSpec, TaskSpec
+from forgeagent.observability import setup_observability
 from forgeagent.orchestration import Orchestrator
 from forgeagent.storage import Store, get_store
 
@@ -32,7 +35,17 @@ class RunCreate(BaseModel):
 
 
 settings = get_settings()
-app = FastAPI(title="ForgeAgent API", version="0.1.0")
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+    cfg = cast(Settings, getattr(application.state, "settings", settings))
+    if cfg.env != "test":
+        setup_observability(cfg)
+    yield
+
+
+app = FastAPI(title="ForgeAgent API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -40,6 +53,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.state.settings = settings
 app.state.store = get_store()
 
 
