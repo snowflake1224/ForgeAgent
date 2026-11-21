@@ -27,7 +27,7 @@
   </defs>
 
   <rect width="1100" height="540" fill="url(#bg2)"/>
-  <text x="34" y="40" class="t">Bounded Repair &amp; Ablation Pipeline (Architectures AD)</text>
+  <text x="34" y="40" class="t">Bounded Repair &amp; Ablation Pipeline (Architectures A&#8211;D)</text>
   <text x="34" y="60" class="s">Controlled experimental pipeline sharing the same MCP tools, ExecutionBudget limits, and ExecutionReport contract</text>
 
   <!-- Main horizontal pipeline -->
@@ -56,7 +56,7 @@
   <text x="918" y="138" class="ns">Variants C &amp; D only</text>
   <text x="918" y="152" class="ns">explicit verdict</text>
 
-  <!-- Repair Loop & Outcomes -->
+  <!-- Repair Loop &amp; Outcomes -->
   <rect x="689" y="232" width="175" height="64" class="fail"/>
   <text x="703" y="256" class="nt">Bounded Debug Loop</text>
   <text x="703" y="274" class="ns">failure-diagnosis</text>
@@ -99,23 +99,23 @@
   <text x="300" y="426" class="ns">1</text>
   <text x="470" y="426" class="ns">No</text>
   <text x="660" y="426" class="ns">No</text>
-  <text x="850" y="426" class="ns">6 iters · 14 tools</text>
+  <text x="850" y="426" class="ns">6 iters &#183; 14 tools</text>
 
   <text x="52" y="448" class="ns">B_planner_coder</text>
   <text x="300" y="448" class="ns">2</text>
   <text x="470" y="448" class="ns">No</text>
   <text x="660" y="448" class="ns">No</text>
-  <text x="850" y="448" class="ns">6 iters · 14 tools</text>
+  <text x="850" y="448" class="ns">6 iters &#183; 14 tools</text>
 
   <text x="52" y="470" class="ns">C_planner_coder_reviewer</text>
   <text x="300" y="470" class="ns">2</text>
   <text x="470" y="470" class="ns">Yes (ReviewVerdict gate)</text>
   <text x="660" y="470" class="ns">No</text>
-  <text x="850" y="470" class="ns">7 iters · 15 tools</text>
+  <text x="850" y="470" class="ns">7 iters &#183; 15 tools</text>
 
   <text x="52" y="492" class="ns">D_specialized_multi_agent</text>
   <text x="300" y="492" class="ns">3</text>
   <text x="470" y="492" class="ns">Yes (ReviewVerdict gate)</text>
   <text x="660" y="492" class="ns">Yes (AST + text hits)</text>
-  <text x="850" y="492" class="ns">8 iters · 27 tools</text>
+  <text x="850" y="492" class="ns">8 iters &#183; 27 tools</text>
 </svg>
